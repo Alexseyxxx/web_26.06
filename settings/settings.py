@@ -1,24 +1,27 @@
 from pathlib import Path
 import os
+from datetime import timedelta
 
 from decouple import config
 
-from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+KEYS_PATH = os.path.join(BASE_DIR, "keys")
 SECRET_KEY = config("SECRET_KEY")
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
-    'rest_framework_simplejwt',
-    'drf_yasg',
+    "daphne",
+    "rest_framework_simplejwt",
+    "drf_yasg",
     "rest_framework",
+    "publics.apps.PublicsConfig",
     "images.apps.ImagesConfig",
     "users.apps.UsersConfig",
+    "chats.apps.ChatsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -55,6 +58,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "settings.wsgi.application"
+ASGI_APPLICATION = "settings.asgi.application"
 
 DATABASES = {
     "default": {
@@ -63,12 +67,21 @@ DATABASES = {
     }
 }
 
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly"
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication"
     ]
 }
 
@@ -114,19 +127,19 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SWAGGER_SETTINGS ={
-    "SECURITY_DEFINITTIONS":{
-      
-        "Bearer":{
-            "type":"apiKey",
-            "name":"Authorization",
-            "in":"header"
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }
+
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
-    "REFRESH_TOKEN_LIFETIME": timedelta(hours= 5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(hours=5),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": False,

@@ -10,17 +10,19 @@ class UserModelSerializer(serializers.ModelSerializer):
             "username", "first_name", 
             "last_name", "email", "password"
         ]
-        # exclude = ["password", "groups", "user_permissions"]
-
-   
 
     def create(self, validated_data):
-        validated_data["password"] = make_password(validated_data["password"])
+        validated_data["password"] = make_password(
+            validated_data["password"]
+        )
+        validated_data["is_active"] = False
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         if "password" in validated_data:
-            validated_data["password"] = make_password(validated_data["password"])
+            validated_data["password"] = make_password(
+                validated_data["password"]
+            )
         return super().update(instance, validated_data)
 
 
@@ -39,4 +41,18 @@ class UserSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["username"] == attrs.get("password"):
             raise serializers.ValidationError("Password cannot be the same as username")
+        self.validate_username(value=attrs["username"])
         return attrs
+
+    def create(self, validated_data):
+        validated_data["password"] = make_password(
+            validated_data["password"]
+        )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if "password" in validated_data:
+            validated_data["password"] = make_password(
+                validated_data["password"]
+            )
+        return super().update(instance, validated_data)

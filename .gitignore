@@ -2,4 +2,4 @@
 __pycache__/
 env/
 *.sqlite3
-keys/
+keys/web_project/ 

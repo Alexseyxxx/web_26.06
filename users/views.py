@@ -6,14 +6,19 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth.models import User
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from django.utils.decorators import method_decorator
 from users.serializers import UserModelSerializer, UserSerializer
 from users.models import Codes
-
+from common.paginators import CustomPageNumberPagination
+from django.core.cache import cache
+from django.db import connection
+from loguru import logger
 
 class RegistrationViewSet(ViewSet):
     permission_classes = [AllowAny]
@@ -79,13 +84,19 @@ class UserViewSet(ViewSet):
     @swagger_auto_schema(
         responses={200: UserSerializer(many=True)}
     )
+    @method_decorator(cache_page(timeout=60))
     def list(self, request: Request) -> Response:
-        queryset = User.objects.all()
-        serializer = UserSerializer(queryset, many=True)
-        return Response(
-            data=serializer.data, status=status.HTTP_200_OK
-        )
-
+        queryset = User.objects.all() # Достаем пользователей
+        paginator = CustomPageNumberPagination() # объявляем пагинатор
+        items = paginator.paginate_queryset(
+            queryset=queryset, request=request
+        ) # делим юзеров на кучки
+        serializer = UserSerializer(
+            instance=items, many=True
+        ) # в сериализатор передаем кучки пользователей
+        return paginator.get_paginated_response(
+            data=serializer.data
+        ) # вывод с пагинацией
 
     @swagger_auto_schema(
         responses={

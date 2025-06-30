@@ -1,19 +1,13 @@
 from django.contrib import admin
 from publics.models import Public, PublicInvite
 
-
 @admin.register(Public)
 class PublicAdmin(admin.ModelAdmin):
     list_display = ("title", "owner", "is_private")
     list_filter = ("is_private", "owner")
     search_fields = ("title", "owner__username")
-
-    # отображение списка участников в виде колонок
     filter_horizontal = ("members",)
-
-    # явное указание отображаемых полей при создании/редактировании
     fields = ("owner", "title", "is_private", "members")
-
 
 @admin.register(PublicInvite)
 class PublicInviteAdmin(admin.ModelAdmin):

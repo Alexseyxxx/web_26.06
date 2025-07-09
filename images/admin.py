@@ -1,8 +1,6 @@
 from django.contrib import admin
 
-from images.models import Images
+from images.models import Images, Gallery, Avatar
 
 
-@admin.register(Images)
-class ImagesAdmin(admin.ModelAdmin):
-    model = Images
+admin.site.register([Images, Gallery, Avatar])

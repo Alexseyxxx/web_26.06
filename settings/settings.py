@@ -1,8 +1,10 @@
 from pathlib import Path
 import os
+import sys
 from datetime import timedelta
 
 from decouple import config
+from loguru import logger
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,6 +20,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "drf_yasg",
     "rest_framework",
+    "debug_toolbar",
     "publics.apps.PublicsConfig",
     "images.apps.ImagesConfig",
     "users.apps.UsersConfig",
@@ -35,6 +38,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -45,7 +49,7 @@ ROOT_URLCONF = "settings.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR/"templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -71,7 +75,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379,0)],
+            "hosts": [("127.0.0.1", 6379, 0)],
         },
     },
 }
@@ -104,9 +108,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-RU"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Almaty"
 
 USE_I18N = True
 
@@ -177,12 +181,41 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSlidingSerializer",
 }
 
+logger.remove()
+logger.add(sink=sys.stderr, level="INFO")
+
+DEBUG_TOOLBAR_PANELS = [
+    'debug_toolbar.panels.history.HistoryPanel',
+    'debug_toolbar.panels.versions.VersionsPanel',
+    'debug_toolbar.panels.timer.TimerPanel',
+    'debug_toolbar.panels.settings.SettingsPanel',
+    'debug_toolbar.panels.headers.HeadersPanel',
+    'debug_toolbar.panels.request.RequestPanel',
+    'debug_toolbar.panels.sql.SQLPanel',
+    'debug_toolbar.panels.staticfiles.StaticFilesPanel',
+    'debug_toolbar.panels.templates.TemplatesPanel',
+    'debug_toolbar.panels.alerts.AlertsPanel',
+    'debug_toolbar.panels.cache.CachePanel',
+    'debug_toolbar.panels.signals.SignalsPanel',
+    'debug_toolbar.panels.redirects.RedirectsPanel',
+    'debug_toolbar.panels.profiling.ProfilingPanel',
+]
+
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
-        "LOCATION": "127.0.0.1:11211",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
     }
 }
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+

@@ -1,73 +1,69 @@
-from django.shortcuts import render
-from rest_framework.viewsets import ViewSet
+from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.viewsets import ViewSet
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.db.models import QuerySet
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import User
 from drf_yasg.utils import swagger_auto_schema
 
-from publics.models import Public
-from publics.serializers import PublicSerializer, PublicViewSerializer
+from publics.models import Public, PublicInvite
+from publics.serializers import (
+    PublicSerializer, PublicViewSerializer,
+)
 
 
 class PublicViewSet(ViewSet):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+    
+    @method_decorator(cache_page(timeout=60*10))
+    def list(self, request: Request) -> Response:
+        # publics: QuerySet[Public] = \
+        #     Public.objects.select_related("owner").filter(is_private=False)
+        publics: QuerySet[Public] = \
+            Public.objects.select_related(
+                "owner"
+            ).prefetch_related("members").filter(is_private=False)
+        serializer = PublicViewSerializer(
+            instance=publics, many=True
+        )
+        return Response(data=serializer.data)
 
-    @swagger_auto_schema(
-        responses={200: PublicViewSerializer(many=True)}
-    )
-    def list(self, request):
-        publics = Public.objects.filter(members=request.user)
-        serializer = PublicViewSerializer(publics, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @swagger_auto_schema(
-        request_body=PublicSerializer,
-        responses={201: PublicViewSerializer, 400: "Неверный запрос"}
-    )
-    def create(self, request):
-        serializer = PublicSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        public = serializer.save()
-        response_data = PublicViewSerializer(instance=public)
-        return Response(response_data.data, status=status.HTTP_201_CREATED)
-
-    @swagger_auto_schema(
-        responses={200: PublicViewSerializer, 404: "Паблик не найден"}
-    )
-    def retrieve(self, request, pk=None):
-        public = get_object_or_404(Public, pk=pk, members=request.user)
+    @method_decorator(cache_page(timeout=600))
+    def retrieve(self, request: Request, pk: int) -> Response:
+        # public: Public = get_object_or_404(
+        #     Public, pk=pk, members=request.user
+        # )
+        public = Public.objects.select_related("owner").get(pk=pk)
         serializer = PublicViewSerializer(instance=public)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(data=serializer.data)
 
     @swagger_auto_schema(
         request_body=PublicSerializer,
-        responses={200: PublicViewSerializer, 404: "Не найдено"}
+        responses={
+            200: PublicViewSerializer,
+            400: "Bad Request"
+        }
     )
-    def update(self, request, pk=None):
-        public = get_object_or_404(Public, pk=pk, owner=request.user)
-        serializer = PublicSerializer(instance=public, data=request.data)
+    def create(self, request: Request) -> Response:
+        serializer = PublicSerializer(
+            data=request.data,
+            context={"owner": request.user}
+        )
         serializer.is_valid(raise_exception=True)
-        updated_public = serializer.save()
-        return Response(PublicViewSerializer(updated_public).data)
+        obj = serializer.save()
+        response_serializer = PublicViewSerializer(instance=obj)
+        return Response(data=response_serializer.data)
 
-    @swagger_auto_schema(
-        request_body=PublicSerializer,
-        responses={200: PublicViewSerializer, 404: "Не найдено"}
-    )
-    def partial_update(self, request, pk=None):
-        public = get_object_or_404(Public, pk=pk, owner=request.user)
-        serializer = PublicSerializer(instance=public, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        updated_public = serializer.save()
-        return Response(PublicViewSerializer(updated_public).data)
+    def update(self, request: Request, pk: int) -> Response:
+        pass
 
-    @swagger_auto_schema(
-        responses={200: "Паблик удалён", 404: "Не найдено"}
-    )
-    def destroy(self, request, pk=None):
-        public = get_object_or_404(Public, pk=pk, owner=request.user)
-        public.delete()
-        return Response("Паблик удалён", status=status.HTTP_200_OK)
+    def partial_update(self, request: Request, pk: int) -> Response:
+        pass
+
+    def destroy(self, request: Request, pk: int) -> Response:
+        pass

@@ -8,17 +8,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth.models import User
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.utils.decorators import method_decorator
+from loguru import logger
+
 from users.serializers import UserModelSerializer, UserSerializer
 from users.models import Codes
 from common.paginators import CustomPageNumberPagination
-from django.core.cache import cache
-from django.db import connection
-from loguru import logger
+
 
 class RegistrationViewSet(ViewSet):
     permission_classes = [AllowAny]
@@ -37,8 +37,8 @@ class RegistrationViewSet(ViewSet):
         s.validated_data["is_active"] = False
         try:
             user = User.objects.create_user(**s.validated_data)
-            code = Codes(user=user)
-            code.save()
+            # code = Codes(user=user)
+            # code.save()
             # отправка письма с кодом активации
             return Response(
                 data={"message": "User successfully registered"},
@@ -52,8 +52,8 @@ class RegistrationViewSet(ViewSet):
 
 
 class UserViewSet(ViewSet):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+    # authentication_classes = [JWTAuthentication]
 
     @staticmethod
     def check_user(request: Request, pk: int) -> User:
@@ -68,10 +68,10 @@ class UserViewSet(ViewSet):
         url_name="activate"
     )
     def activation_page(
-        self, request: Request, pk: int
+        self, request: Request, code:str
     ) -> Response:
-        user = get_object_or_404(User, pk=pk)
-        code = request.query_params.get("code")
+        username =code.split("|")[0]
+        user = get_object_or_404(User, username=username)
         obj: Codes = get_object_or_404(Codes, user=user, code=code)
         now = timezone.now()
         diff = now - obj.created_at
@@ -84,16 +84,19 @@ class UserViewSet(ViewSet):
     @swagger_auto_schema(
         responses={200: UserSerializer(many=True)}
     )
-    @method_decorator(cache_page(timeout=60))
+    @method_decorator(cache_page(timeout=60*10))
     def list(self, request: Request) -> Response:
         queryset = User.objects.all() # Достаем пользователей
+        logger.info(f"Запросы после queryset: {connection.queries}")
         paginator = CustomPageNumberPagination() # объявляем пагинатор
         items = paginator.paginate_queryset(
             queryset=queryset, request=request
         ) # делим юзеров на кучки
+        logger.info(f"Запросы после пагинации: {connection.queries}")
         serializer = UserSerializer(
             instance=items, many=True
         ) # в сериализатор передаем кучки пользователей
+        # return Response(data=serializer.data)
         return paginator.get_paginated_response(
             data=serializer.data
         ) # вывод с пагинацией
@@ -104,6 +107,7 @@ class UserViewSet(ViewSet):
             404: "User not found"
         }
     )
+    @method_decorator(cache_page(timeout=60*10))
     def retrieve(self, request: Request, pk: int) -> Response:
         user = get_object_or_404(User, pk=pk)
         serializer = UserSerializer(user)
@@ -137,6 +141,7 @@ class UserViewSet(ViewSet):
         }
     )
     def partial_update(self, request: Request, pk: int) -> Response:
+        User.objects.prefetch_related
         user = self.check_user(request=request, pk=pk)
         serializer = UserModelSerializer(
             instance=user, data=request.data, partial=True

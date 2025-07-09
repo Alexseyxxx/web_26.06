@@ -14,6 +14,9 @@ from rest_framework_simplejwt.views import (
 from users.views import RegistrationViewSet, UserViewSet
 from chats.views import ChatsViewSet, MessagesViewSet
 from publics.views import PublicViewSet
+from images.views import GalleryView, ImagesView
+from django.http import HttpResponse
+from django.conf.urls.static import static
 
 
 router = DefaultRouter()
@@ -37,6 +40,14 @@ router.register(
     prefix="publics", viewset=PublicViewSet,
     basename="publics"
 )
+router.register(
+    prefix="gallery", viewset=GalleryView,
+    basename="gallery"
+)
+router.register(
+    prefix="images", viewset=ImagesView,
+    basename="images"
+)
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -52,6 +63,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    path("", lambda request: HttpResponse("Главная страница  !")),
     path(route="admin/", view=admin.site.urls),
     path(route="api/token/",
          view=TokenObtainPairView.as_view(), name="token_obtain_pair"
@@ -64,11 +76,17 @@ urlpatterns = [
          view=schema_view.with_ui("swagger", cache_timeout=0),
          name="schema-swagger-ui"
     ),
-]
+] + debug_toolbar_urls()
 
 if settings.DEBUG:
-    urlpatterns += debug_toolbar_urls()
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+
+
+
+
+
+ 
 # from django.http import HttpResponse
 # from django.urls import path, include
 # from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView

@@ -1,29 +1,131 @@
+# from django.db import models  # Импортируем базовый модуль для моделей
+# from django.contrib.auth.models import AbstractUser  # Наследуемся от AbstractUser, чтобы кастомизировать пользователя
+# from django.utils import timezone  # Для установки даты и времени
+# import uuid  # Для генерации уникального кода активации
+# from dirtyfields import DirtyFieldsMixin  # Для отслеживания изменений полей
+
+# class Client(DirtyFieldsMixin, AbstractUser):
+#     email = models.EmailField(
+#         verbose_name="почта",              # Название поля в админке и сериализаторах
+#         max_length=150,
+#         unique=True                        # Email должен быть уникальным
+#     )
+
+#     activation_code = models.UUIDField(
+#         verbose_name="код активации",      # UUID-код, например, для подтверждения регистрации
+#         unique=True,
+#         default=uuid.uuid4                 # Генерируется автоматически при создании
+#     )
+
+#     expired_code = models.DateTimeField(
+#         verbose_name="срок действия кода", # Когда код перестанет быть действительным
+#         null=True,
+#         blank=True                         # Можно не задавать при создании вручную
+#     )
+
+#     avatar = models.ImageField(
+#         verbose_name="аватар пользователя",# Изображение, загружаемое пользователем
+#         upload_to="avatars/",              # Каталог в MEDIA_ROOT
+#         blank=True,
+#         null=True
+#     )
+
+#     friends = models.ManyToManyField(
+#         to="self",                         # Связь с другими пользователями
+#         symmetrical=False,                 # Связь несимметрична: A добавил B, но B — не обязательно A
+#         verbose_name="друзья",
+#         blank=True
+#     )
+
+#     def __str__(self):
+#         return self.username
+import uuid
+from datetime import timedelta
+
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from dirtyfields import DirtyFieldsMixin
 
 
-class Codes(models.Model):
-    code = models.CharField(
-        verbose_name="код активации",
-        unique=False,
-        default="qwertyuiop"
+class Client(DirtyFieldsMixin, AbstractUser):
+    is_active = models.BooleanField(
+        verbose_name="активированный аккаунт", default=False
     )
-    user = models.OneToOneField(
-        to=User,
-        on_delete=models.CASCADE,
-        related_name="user_code",
-        verbose_name="пользователь"
+    email = models.EmailField(
+        verbose_name="эл. почта", max_length=100, unique=True
     )
-    created_at = models.DateTimeField(
-        verbose_name="дата создания",
-        default=timezone.now
+    activation_code = models.UUIDField(
+        verbose_name="код активации", unique=True, default=uuid.uuid4
+    )
+    expired_code = models.DateTimeField(
+        verbose_name="срок действия кода"
+    )
+    avatar = models.OneToOneField(
+        to="images.Image",
+        on_delete=models.SET_NULL,
+        related_name="user_avatar",
+        null=True,
+        verbose_name="аватар пользователя",
+        blank=True,
+    )
+    friends = models.ManyToManyField(
+        to="self", verbose_name="друзья", blank=True
     )
 
     class Meta:
-        ordering = ("created_at",)
-        verbose_name = "код активации"
-        verbose_name_plural = "коды активации"
+        ordering = ("id",)
+        verbose_name = "пользователь"
+        verbose_name_plural = "пользователи"
 
     def __str__(self):
-        return f"{self.user.username} | {self.created_at}"
+        return f"{self.pk} -> {self.username} -> {self.email}"
+
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+    
+        if self.is_superuser:
+            self.is_active = True
+            self.expired_code = now
+            return super().save(*args, **kwargs)
+    
+        if not self.pk:
+            self.expired_code = now + timedelta(minutes=3)
+    
+        return super().save(*args, **kwargs)
+
+
+class FriendInvite(models.Model):
+    from_client = models.ForeignKey(
+        to=Client,
+        on_delete=models.CASCADE,
+        related_name="sent_friend_invites",
+        verbose_name="кто",
+    )
+    to_client = models.ForeignKey(
+        to=Client,
+        on_delete=models.CASCADE,
+        related_name="received_friend_invites",
+        verbose_name="кого",
+    )
+    date_created = models.DateField(
+        verbose_name="дата создания", auto_now_add=True
+    )
+    is_accepted = models.BooleanField(
+        verbose_name="принято", null=True, default=None
+    )
+
+    class Meta:
+        ordering = ("id",)
+        verbose_name = "приглашение"
+        verbose_name_plural = "приглашения"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["from_client", "to_client"],
+                name="unique_friend_invite",
+            )
+        ]
+
+    def __str__(self):
+        return (f"{self.from_client} -> {self.to_client} | "
+                f"{self.date_created} -> {self.is_accepted}")

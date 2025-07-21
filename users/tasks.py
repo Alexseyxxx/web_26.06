@@ -1,27 +1,64 @@
-from django.contrib.auth.models import User
-from django.utils import timezone
-from loguru import logger
-from django.db.models import QuerySet
-from settings.celery import app
-from common. mail import send_email
-from datetime import timedelta,date
+# from django.contrib.auth.models import User  # Импорт модели пользователя Django
+# from django.utils import timezone  # Модуль для работы с текущей датой и временем с учётом временных зон
+# from loguru import logger  # Импортируем логгер для записи информации о действиях
+# from django.db.models import QuerySet  # Для типизации переменной users (необязательно, но полезно)
+# from settings.celery import app  # Импорт экземпляра Celery из настроек
+# from common.mail import send_email  # Функция для отправки писем
+# from datetime import timedelta, date  # Модули для работы с датами и временем
 
-@app.task(name="send-congrats")
-def send_congrats():
-    lookup_date = (timezone.now() - timedelta(days=20)).date()  # можно 30, если месяц
+# # Регистрируем функцию как задачу Celery с именем "send-congrats"
+# @app.task(name="send-congrats")
+# def send_congrats():
+#     # Получаем дату 20 дней назад от текущей
+#     lookup_date = (timezone.now() - timedelta(days=20)).date()
 
-    users = User.objects.filter(date_joined__date=lookup_date)
+#     # Фильтруем пользователей, которые зарегистрировались именно в эту дату
+#     users = User.objects.filter(date_joined__date=lookup_date)
 
-    if not users.exists():
-        logger.info("Нет пользователей, зарегистрированных месяц назад.")
-        return
+#     # Если таких пользователей нет — выводим сообщение и выходим
+#     if not users.exists():
+#         logger.info("Нет пользователей, зарегистрированных месяц назад.")
+#         return
 
-    to = [user.email for user in users]
+#     # Извлекаем список email-адресов найденных пользователей
+#     to = [user.email for user in users]
 
-    send_email(
-        to=to,
-        template="congrats.html",  # шаблон письма
-        context={"days": 20},
-        title="Спасибо, что с нами уже месяц!"
-    )
-    logger.info(f"Отправлено поздравление пользователям.")
+#     # Отправляем письмо на каждый email
+#     send_email(
+#         to=to,  # список email-адресов
+#         template="congrats.html",  # шаблон HTML-письма
+#         context={"days": 20},  # контекст для шаблона (например, количество дней)
+#         title="Спасибо, что с нами уже месяц!"  # тема письма
+#     )
+
+#     # Логируем информацию об отправке
+#     logger.info(f"Отправлено поздравление пользователям.")
+
+
+from celery import Task
+
+from common.mail import send_email
+from settings import celery_app
+
+
+class ActivateAccountTask(Task):
+    name = 'activate-account'
+    default_retry_delay = 60
+
+    def run(self, pk:int, username: str, email: str, code:str):
+        try:
+            send_email(
+                template="activation.html", to=email,
+                context={
+                    "username": username,
+                    "code": ("http://127.0.0.1:8000/api/v1"
+                             f"users/activate/{pk}/?code={code}"),
+                },
+                title="Confirm your account",
+            )
+        except Exception as e:
+            raise self. retry(
+                exc=e,
+                countdown=60 * (self.request.reties + 1)
+            )
+celery_app.register_task(task=ActivateAccountTask)

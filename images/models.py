@@ -1,18 +1,30 @@
+import os
+import uuid
+
 from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
-
-from publics.models import Public
+from django.db.models import Q, CheckConstraint
 
 
-class Images(models.Model):
+def image_upload_to(instance, filename):
+    ext = os.path.splitext(filename)[1]
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+
+    if hasattr(instance, "user_avatar"):
+        return f"avatars/users/{unique_name}"
+    elif hasattr(instance, "public_avatar"):
+        return f"avatars/publics/{unique_name}"
+    elif hasattr(instance, "post_usage"):
+        return f"posts/{unique_name}"
+    return f"misc/{unique_name}"
+
+
+class Image(models.Model):
     image = models.ImageField(
-        verbose_name="изображение", 
-        upload_to="images/",
+        verbose_name="изображение",
+        upload_to=image_upload_to,
     )
     created_at = models.DateTimeField(
-        verbose_name="дата создания",
-        auto_now_add=True
+        verbose_name="дата создания", auto_now_add=True
     )
 
     class Meta:
@@ -26,66 +38,38 @@ class Images(models.Model):
 
 class Gallery(models.Model):
     user = models.OneToOneField(
-        to=User,
+        to="users.Client",
         on_delete=models.CASCADE,
         related_name="user_gallery",
         blank=True,
         null=True,
-        verbose_name="пользователь"
+        verbose_name="пользователь",
     )
     public = models.OneToOneField(
-        to=Public,
+        to="publics.Public",
         on_delete=models.CASCADE,
         related_name="public_gallery",
         blank=True,
         null=True,
-        verbose_name="паблик"
+        verbose_name="паблик",
     )
     images = models.ManyToManyField(
-        to=Images,
-        related_name="gallery_images",
-        verbose_name="изображения"
+        to=Image,
+        related_name="gallery_usage",
+        verbose_name="изображения",
     )
 
     class Meta:
         ordering = ("id",)
         verbose_name = "галлерея"
         verbose_name_plural = "галлереи"
-
-    def __str__(self):
-        return f"{self.pk}"
-
-
-class Avatar(models.Model):
-    user = models.OneToOneField(
-        to=User,
-        on_delete=models.CASCADE,
-        related_name="user_avatar",
-        blank=True,
-        null=True,
-        verbose_name="пользователь"
-    )
-    public = models.OneToOneField(
-        to=Public,
-        on_delete=models.CASCADE,
-        related_name="public_avatar",
-        blank=True,
-        null=True,
-        verbose_name="паблик"
-    )
-    images = models.OneToOneField(
-        to=Images,
-        related_name="avatar_image",
-        verbose_name="изображения",
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True
-    )
-
-    class Meta:
-        ordering = ("id",)
-        verbose_name = "аватар"
-        verbose_name_plural = "аватары"
+        constraints = [CheckConstraint(
+            check=(
+                (Q(user__isnull=False) & Q(public__isnull=True))
+                | (Q(user__isnull=True) & Q(public__isnull=False))
+            ),
+            name="only_user_or_public",
+        )]
 
     def __str__(self):
         return f"{self.pk}"

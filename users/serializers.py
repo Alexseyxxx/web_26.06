@@ -133,6 +133,7 @@ class FriendInviteSerializer(serializers.ModelSerializer):
     class Meta:
         model = FriendInvite
         fields = [
+            "pk",
             "from_client",
             "to_client",
             "date_created",

@@ -1,4 +1,3 @@
-
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet, GenericViewSet
@@ -20,6 +19,7 @@ from users.serializers import (
 from users.models import Client, FriendInvite
 from common.paginators import CustomPageNumberPagination
 from common.permissions import IsOwnerOrAdmin
+from common.filters import SearchFilter
 
 
 class RegistrationViewSet(mixins.CreateModelMixin, GenericViewSet):
@@ -55,7 +55,7 @@ class ActivateAccount(APIView):
             return Response({"message": "activation success!"})
         return render(request, "api/activation_success.html")
     
-    
+
 class UserModelViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -64,10 +64,13 @@ class UserModelViewSet(
     GenericViewSet,
 ):
     permission_classes = [IsOwnerOrAdmin]
-    queryset = Client.objects.all()
+    queryset = Client.objects.all().select_related("avatar")
     serializer_class = UserModelSerializer
     parser_classes = [MultiPartParser, FormParser]
     pagination_class = CustomPageNumberPagination
+    filter_backends = [SearchFilter]
+    search_fields = ["username", "email"]
+    sort_by_fields = []
 
     @method_decorator(cache_page(timeout=600))
     def list(self, request, *args, **kwargs):
@@ -154,3 +157,9 @@ class FriendInvitesView(ViewSet):
         )
         invite.delete()
         return Response(data={"message": "success"})
+
+# QUERY_PARAMS
+# search - поиск по значению
+# orderBy (asc/desc) - сортировка по убыванию/возрастанию
+# filter/sortBy - сортировка по каким нибудь атрибутам 
+# http://localhost/api/users/&search=Иван Иванов&sortBy=birthday&orderBy=asc

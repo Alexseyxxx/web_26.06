@@ -3,7 +3,7 @@ import uuid
 
 from django.db import models
 from django.db.models import Q, CheckConstraint
-from django.conf import settings  # добавлен импорт
+
 
 def image_upload_to(instance, filename):
     ext = os.path.splitext(filename)[1]
@@ -38,7 +38,7 @@ class Image(models.Model):
 
 class Gallery(models.Model):
     user = models.OneToOneField(
-        to=settings.AUTH_USER_MODEL,  # заменено здесь
+        to="users.Client",
         on_delete=models.CASCADE,
         related_name="user_gallery",
         blank=True,

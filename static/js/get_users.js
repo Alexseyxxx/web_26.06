@@ -1,6 +1,7 @@
 const mainBlock = document.querySelector("#main-block");
 const friendButton = document.querySelector("#friend-finder");
 const access = localStorage.getItem("access");
+const searchInput = document.querySelector("#search-input");
 
 // создаём блоки динамически
 const searchBlock = document.createElement("div");
@@ -72,12 +73,98 @@ async function getFriends () {
                     console.log("Детали пользователя:", userData);
 
                     // тут можешь перерисовать usersBlock под подробный профиль
+usersBlock.innerHTML = data.map(user => {
+    // если нет аватара — подставляем дефолт
+    const avatar = user.avatar && user.avatar !== "undefined"
+        ? user.avatar
+        : "/static/default-avatar.png";
+
+    return `
+        <div class="user-card">
+            <img 
+                src="${avatar}" 
+                alt="${user.username}" 
+                class="w-full h-full object-cover"
+                onerror="this.src='/static/default-avatar.png'"
+            >
+            <p class="username">${user.username}</p>
+        </div>
+    `;
+}).join("");
+
+
+                } catch (err) {
+                    console.error("Ошибка при получении пользователя:", err);
+                }
+            });
+        });
+
+
+    } catch (err) {
+        console.error("Ошибка при запросе:", err);
+        usersBlock.innerHTML = `<p style="color:red;">Не удалось загрузить пользователей</p>`;
+    }
+}
+
+async function makeSearch (username) {
+    try {
+        const response = await fetch(`/api/v1/users/?search=${username}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${access}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ошибка ${response.status}`);
+        }
+
+        const apiData = await response.json();
+        console.log(apiData);
+                usersBlock.innerHTML = apiData.results.map(user => `
+            <div class="user-card flex items-center gap-4 p-4 mb-3 bg-white border rounded-xl shadow hover:shadow-md transition" 
+            data-user-id="${user.id}">
+                <!-- Аватар -->
+                <div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+                    ${user.avatar 
+                        ? `<img src="${user.avatar}" alt="${user.username}" class="w-full h-full object-cover">` 
+                        : `<span class="flex items-center justify-center w-full h-full text-gray-500">👤</span>`}
+                </div>
+                <!-- Инфо -->
+                <div>
+                    <div class="font-semibold text-gray-800">${user.username}</div>
+                    <div class="text-sm text-gray-600">${user.first_name} ${user.last_name}</div>
+                </div>
+            </div>
+        `).join("");
+
+        document.querySelectorAll(".user-card").forEach(card => {
+            card.addEventListener("click", async () => {
+                const userId = card.dataset.userId;
+                console.log("Открываю профиль:", userId);
+
+                try {
+                    const response = await fetch(`/api/v1/users/${userId}/`, {
+                        headers: {
+                            "Authorization": `Bearer ${access}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Ошибка ${response.status}`);
+                    }
+
+                    const userData = await response.json();
+                    console.log("Детали пользователя:", userData);
+
+                    // тут можешь перерисовать usersBlock под подробный профиль
                     usersBlock.innerHTML = `
                         <div class="p-4 border rounded-xl bg-white shadow">
                             <div class="flex items-center gap-4">
                                 <div class="w-20 h-20 rounded-full overflow-hidden bg-gray-200">
                                     ${userData.avatar 
-                                        ? `<img src="${userData.avatar}" alt="${userData.username}" class="w-full h-full object-cover">`
+                                        ? `<img src="${userData.avatar.image}" alt="${userData.username}" class="w-full h-full object-cover">`
                                         : `<span class="flex items-center justify-center w-full h-full h-full text-gray-500">👤</span>`
                                     }
                                 </div>
@@ -97,7 +184,6 @@ async function getFriends () {
             });
         });
 
-
     } catch (err) {
         console.error("Ошибка при запросе:", err);
         usersBlock.innerHTML = `<p style="color:red;">Не удалось загрузить пользователей</p>`;
@@ -107,15 +193,31 @@ async function getFriends () {
 function renderSearch() {
     searchBlock.innerHTML = `
         <div class="mb-4">
-            <input 
-                id="search-input"
-                type="text" 
-                placeholder="Поиск друзей..." 
-                class="w-full p-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300 focus:outline-none"
-            >
+            <div class="flex gap-2">
+                <input 
+                    id="search-input"
+                    type="text" 
+                    placeholder="Поиск друзей..." 
+                    class="flex-1 p-2 border rounded-lg shadow-sm focus:ring focus:ring-blue-300 focus:outline-none"
+                >
+                <button 
+                    id="search-btn"
+                    class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                >
+                    Искать
+                </button>
+            </div>
         </div>
     `;
-}
+
+    const searchInput = document.getElementById("search-input");
+    const searchBtn = document.getElementById("search-btn");
+
+    searchBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        makeSearch(searchInput.value.trim());
+    });
+};
 
 friendButton.addEventListener("click", async (e) => {
     e.preventDefault();

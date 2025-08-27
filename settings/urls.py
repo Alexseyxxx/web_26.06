@@ -191,10 +191,11 @@
 #     path("api/v1/users/activate/<int:pk>/", ActivateAccount.as_view(), name="activate-account"),
 # ] + debug_toolbar_urls()
 
-
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
+from django.conf import settings
+from django.conf.urls.static import static
 from debug_toolbar.toolbar import debug_toolbar_urls
 from rest_framework.routers import DefaultRouter
 from rest_framework import permissions
@@ -211,6 +212,7 @@ from users.views import (
     UserModelViewSet,
     FriendInvitesView,
 )
+from images.views import ImageViewSet
 
 
 router = DefaultRouter()
@@ -225,26 +227,7 @@ router.register(
 router.register(
     prefix="invites", viewset=FriendInvitesView, basename="invites"
 )
-# router.register(
-#     prefix="chats", viewset=ChatsViewSet,
-#     basename="chats"
-# )
-# router.register(
-#     prefix="messages", viewset=MessagesViewSet,
-#     basename="messages"
-# )
-# router.register(
-#     prefix="publics", viewset=PublicViewSet,
-#     basename="publics"
-# )
-# router.register(
-#     prefix="gallery", viewset=GalleryView,
-#     basename="gallery"
-# )
-# router.register(
-#     prefix="images", viewset=ImagesView,
-#     basename="images"
-# )
+router.register(prefix="images", viewset=ImageViewSet, basename="images")
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -262,32 +245,36 @@ template_patterns = [
     path(
         route="",
         view=TemplateView.as_view(template_name="api/base.html"),
-        name="base"
+        name="base",
     ),
 ]
 
-urlpatterns = [
-    path(route="", view=include(template_patterns)),
-    path(route="admin/", view=admin.site.urls),
-    path(
-        route="api/token/",
-        view=TokenObtainPairView.as_view(),
-        name="token_obtain_pair",
-    ),
-    path(
-        route="api/token/refresh/",
-        view=TokenRefreshView.as_view(),
-        name="token_refresh",
-    ),
-    path(route="api/v1/", view=include(router.urls)),
-    path(
-        route="swagger/",
-        view=schema_view.with_ui("swagger", cache_timeout=0),
-        name="schema-swagger-ui",
-    ),
-    path(
-        "activate/<int:pk>/",
-        ActivateAccount.as_view(),
-        name="activate-account",
-    ),
-] + debug_toolbar_urls()
+urlpatterns = (
+    [
+        path(route="", view=include(template_patterns)),
+        path(route="admin/", view=admin.site.urls),
+        path(
+            route="api/token/",
+            view=TokenObtainPairView.as_view(),
+            name="token_obtain_pair",
+        ),
+        path(
+            route="api/token/refresh/",
+            view=TokenRefreshView.as_view(),
+            name="token_refresh",
+        ),
+        path(route="api/v1/", view=include(router.urls)),
+        path(
+            route="swagger/",
+            view=schema_view.with_ui("swagger", cache_timeout=0),
+            name="schema-swagger-ui",
+        ),
+        path(
+            "activate/<int:pk>/",
+            ActivateAccount.as_view(),
+            name="activate-account",
+        ),
+    ]
+    + debug_toolbar_urls()
+    + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+)

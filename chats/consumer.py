@@ -35,7 +35,7 @@ class ChatConsumer(WebsocketConsumer):
             print("Not authorized!")
             self.close()
 
-    def chat_message(self, event: dict):
-        print("Message sent!")
-        answer = f"{event["date"]} -> {event["user"]["username"]} -> {event["text"]}"
-        self.send(text_data=answer)
+def chat_message(self, event: dict):
+    print("Message sent!")
+    answer = f'{event["date"]} -> {event["user"]["username"]} -> {event["text"]}'
+    self.send(text_data=answer)
